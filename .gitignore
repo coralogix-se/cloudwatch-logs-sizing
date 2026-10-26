@@ -1,0 +1,13 @@
+# Run outputs and account lists contain customer data
+log_sizing_*
+*_log_groups.csv
+*_regions.csv
+*_summary.txt
+*_summary.json
+accounts.json
+
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+.DS_Store

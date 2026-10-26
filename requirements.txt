@@ -1,0 +1,2 @@
+boto3>=1.34
+tqdm>=4.60  # optional: progress bar

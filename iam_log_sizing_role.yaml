@@ -1,0 +1,83 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  Read-only IAM role for Coralogix CloudWatch Logs ingestion sizing.
+  Grants access to log group metadata and CloudWatch metrics only; it cannot
+  read log events. Deploy to every member account in scope (StackSets), and
+  as a regular stack in the management account if it should be scanned too.
+
+Parameters:
+  TrustedAccountId:
+    Type: String
+    AllowedPattern: "^[0-9]{12}$"
+    Description: >
+      AWS account ID that runs collect_log_sizing.py and assumes this role
+      (your management account or a dedicated tooling account).
+
+  TrustedPrincipalArn:
+    Type: String
+    Default: ""
+    Description: >
+      Optional. Restrict the trust to this principal ARN in the trusted account.
+      Wildcards are allowed, e.g.
+      arn:aws:iam::123456789012:role/aws-reserved/sso.amazonaws.com/*/AWSReservedSSO_AdministratorAccess_*
+      Leave empty to trust any principal in TrustedAccountId that is allowed
+      sts:AssumeRole by its own IAM policy.
+
+  RoleName:
+    Type: String
+    Default: CoralogixLogSizingRole
+    Description: Name of the role to create. Must match --role-name in the script.
+
+Conditions:
+  RestrictPrincipal: !Not [!Equals [!Ref TrustedPrincipalArn, ""]]
+
+Resources:
+  CoralogixLogSizingRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Ref RoleName
+      Description: Read-only role for Coralogix CloudWatch Logs ingestion sizing
+      MaxSessionDuration: 3600
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS: !Sub "arn:${AWS::Partition}:iam::${TrustedAccountId}:root"
+            Action: sts:AssumeRole
+            Condition: !If
+              - RestrictPrincipal
+              - ArnLike:
+                  aws:PrincipalArn: !Ref TrustedPrincipalArn
+              - !Ref AWS::NoValue
+      Policies:
+        - PolicyName: CoralogixLogSizingPolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Sid: LogGroupMetadata
+                Effect: Allow
+                Action:
+                  - logs:DescribeLogGroups
+                  - logs:DescribeSubscriptionFilters
+                Resource: "*"
+              - Sid: IngestionMetrics
+                Effect: Allow
+                Action:
+                  - cloudwatch:GetMetricData
+                Resource: "*"
+              - Sid: EnabledRegions
+                Effect: Allow
+                Action:
+                  - ec2:DescribeRegions
+                Resource: "*"
+              - Sid: AccountAlias
+                Effect: Allow
+                Action:
+                  - iam:ListAccountAliases
+                Resource: "*"
+
+Outputs:
+  RoleArn:
+    Description: ARN of the created sizing role
+    Value: !GetAtt CoralogixLogSizingRole.Arn
