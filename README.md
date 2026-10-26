@@ -103,6 +103,7 @@ These rules come from [AWS: Log classes](https://docs.aws.amazon.com/AmazonCloud
 | `<prefix>_regions.csv` | One row per account and region: auth method, status and error, log group count, account-level total, sum of log groups, gap %, average GB/day and events/day |
 | `<prefix>_summary.txt` | Human-readable report (also printed at the end of the run) |
 | `<prefix>_summary.json` | The same report as JSON, for automation and for building reports |
+| `<prefix>_results.zip` | All four files above in one archive. **This is the file to send to Coralogix.** |
 
 The summary contains:
 
@@ -115,7 +116,7 @@ The summary contains:
 - every region that was not fully scanned, with the reason
 - notes and API usage
 
-All files are written as UTF-8 to a temporary file, then renamed into place. If you interrupt the run with Ctrl+C, the tool still writes partial results, marked `interrupted: true`. Output files contain customer data and are listed in `.gitignore`.
+The four report files are kept next to the zip so you can review them before sending. All files are written as UTF-8 (the zip is compressed with deflate) to a temporary file, then renamed into place. If you interrupt the run with Ctrl+C, the tool still writes partial results and the zip, marked `interrupted: true`. Output files contain customer data and are listed in `.gitignore`.
 
 ### Exit codes
 

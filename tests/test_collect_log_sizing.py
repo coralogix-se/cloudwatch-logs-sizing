@@ -4,6 +4,7 @@ import json
 import os
 import sys
 import time
+import zipfile
 from datetime import date, datetime, timedelta, timezone
 
 import boto3
@@ -513,8 +514,11 @@ def test_redacted_outputs_contain_no_names(tmp_path):
     args = cls.parse_args(["--redact", "--check-subscriptions", "--output", str(tmp_path / "out")])
     accounts = [cls.Account(id="111111111111", name="n")]
     summary, files = cls.write_outputs(args.output, [r], accounts, WINDOW, {"tool_version": "t"}, args)
-    for path in files:
+    for path in files[:-1]:
         assert "secret" not in open(path, encoding="utf-8").read(), path
+    with zipfile.ZipFile(files[-1]) as zf:
+        for member in zf.namelist():
+            assert "secret" not in zf.read(member).decode("utf-8"), member
     assert summary["subscriptions"]["with_filters"] == 1
     assert summary["subscriptions"]["destination_types"] == {"lambda": 1}
 
@@ -526,7 +530,11 @@ def test_outputs_written_and_parseable(tmp_path):
     summary, files = cls.write_outputs(args.output, [r], [cls.Account(id="111111111111", name="n")], WINDOW,
                                        {"tool_version": "t"}, args)
     assert [os.path.basename(f) for f in files] == [
-        "out_log_groups.csv", "out_regions.csv", "out_summary.txt", "out_summary.json"]
+        "out_log_groups.csv", "out_regions.csv", "out_summary.txt", "out_summary.json", "out_results.zip"]
+    with zipfile.ZipFile(files[4]) as zf:
+        assert sorted(zf.namelist()) == sorted(os.path.basename(f) for f in files[:4])
+        for f in files[:4]:
+            assert zf.read(os.path.basename(f)) == open(f, "rb").read()
     data = json.load(open(files[3], encoding="utf-8"))
     assert data["totals"]["avg_gb_per_day"] == 1.0
     lines = open(files[0], encoding="utf-8").read().splitlines()

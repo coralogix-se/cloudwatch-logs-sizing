@@ -46,6 +46,7 @@ import re
 import tempfile
 import threading
 import time
+import zipfile
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta, timezone
@@ -1324,8 +1325,27 @@ def write_regions_csv(path: str, results: Sequence[RegionResult], window: Window
     atomic_write(path, write)
 
 
+def write_zip(path: str, members: Sequence[str]) -> None:
+    """Bundle the output files into one archive (flat, by file name) to send to Coralogix."""
+    directory = os.path.dirname(os.path.abspath(path))
+    fd, tmp = tempfile.mkstemp(prefix=".tmp_", suffix=".zip", dir=directory)
+    os.close(fd)
+    try:
+        with zipfile.ZipFile(tmp, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+            for member in members:
+                zf.write(member, arcname=os.path.basename(member))
+        os.replace(tmp, path)
+    except BaseException:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
+
+
 def write_outputs(prefix: str, results: Sequence[RegionResult], accounts: Sequence[Account], window: Window,
                   meta: dict, args: argparse.Namespace) -> Tuple[dict, List[str]]:
+    """Write the four report files, then bundle them into <prefix>_results.zip (returned last)."""
     namer = Namer(args.redact)
     paths = {
         "log_groups": f"{prefix}_log_groups.csv",
@@ -1333,14 +1353,16 @@ def write_outputs(prefix: str, results: Sequence[RegionResult], accounts: Sequen
         "summary_txt": f"{prefix}_summary.txt",
         "summary_json": f"{prefix}_summary.json",
     }
+    zip_path = f"{prefix}_results.zip"
     summary = build_summary(results, accounts, window, meta, namer, args.check_subscriptions)
-    summary["output_files"] = list(paths.values())
+    summary["output_files"] = list(paths.values()) + [zip_path]
     write_log_groups_csv(paths["log_groups"], results, window, namer)
     write_regions_csv(paths["regions"], results, window)
     text = render_text(summary)
     atomic_write(paths["summary_txt"], lambda f: f.write(text + "\n"))
     atomic_write(paths["summary_json"], lambda f: json.dump(summary, f, indent=2))
-    return summary, list(paths.values())
+    write_zip(zip_path, list(paths.values()))
+    return summary, list(paths.values()) + [zip_path]
 
 
 def exit_code_for(results: Sequence[RegionResult], interrupted: bool) -> int:
@@ -1626,6 +1648,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             print("\nERROR: no account-region pairs could be scanned.", file=sys.stderr)
             summary, files = write_outputs(args.output, results, accounts, window, meta, args)
             print(render_text(summary))
+            print(f"\nResults (with the reasons above): {files[-1]}")
             return 1
 
         def task_error(item: Tuple[Account, RegionResult], e: BaseException) -> None:
@@ -1676,8 +1699,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     print()
     print(render_text(summary))
     print("\nOutput files:")
-    for path in files:
+    for path in files[:-1]:
         print(f"  {path}")
+    print(f"\nSend this file to Coralogix (it contains all of the above):\n  {files[-1]}")
     code = exit_code_for(results, interrupted)
     if code == 2:
         print("\nFinished with some accounts or regions not fully scanned (exit code 2); see NOT FULLY SCANNED.")

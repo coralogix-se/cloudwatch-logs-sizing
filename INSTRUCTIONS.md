@@ -2,7 +2,7 @@
 
 These steps take about 15 minutes. The tool is read-only: it reads log group names and CloudWatch metrics and never reads log contents. A full scan of a large organization typically costs well under $1 in CloudWatch API charges, and the tool prints an estimate before it requests any metrics.
 
-When you are done, send the four `log_sizing_*` files to your Coralogix contact. Add `--redact` (step 4) if log group names must not leave your organization.
+When you are done, send `log_sizing_results.zip` to your Coralogix contact. Add `--redact` (step 4) if log group names must not leave your organization.
 
 ## 1. Install
 
@@ -82,12 +82,13 @@ The scan runs in three phases (authenticate, list log groups, read metrics) and 
 
 ## 5. Check the result and send the files
 
-The run writes four files:
+The run writes four report files and a zip that contains all of them:
 
 - `log_sizing_summary.txt`: the human-readable report
 - `log_sizing_summary.json`: the same report as JSON
 - `log_sizing_regions.csv`: one row per account and region, with its status
 - `log_sizing_log_groups.csv`: one row per log group
+- `log_sizing_results.zip`: the four files above in one archive
 
 Before sending them, look at the **NOT FULLY SCANNED** section of the summary and check the exit code:
 
@@ -95,7 +96,7 @@ Before sending them, look at the **NOT FULLY SCANNED** section of the summary an
 - `2`: some accounts or regions failed; the reasons are listed. Fix them and run again, or send the files anyway and point out what was missing.
 - `1`: nothing could be scanned. Run `--preflight` again.
 
-Send all four files to your Coralogix contact.
+Send `log_sizing_results.zip` to your Coralogix contact. You don't need to send the other files separately.
 
 ## FAQ
 

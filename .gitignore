@@ -4,6 +4,7 @@ log_sizing_*
 *_regions.csv
 *_summary.txt
 *_summary.json
+*_results.zip
 accounts.json
 
 __pycache__/
