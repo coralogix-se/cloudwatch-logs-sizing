@@ -1,5 +1,41 @@
 # CloudWatch Logs ingestion sizing for Coralogix
 
+## Run it with Claude
+
+Paste this prompt into Claude Code, or any Claude that can use a terminal on a machine with your AWS credentials. It scans every AWS account you can reach and gives you one zip to send to Coralogix.
+
+```text
+Measure our CloudWatch Logs ingestion for Coralogix across every AWS account I can
+access, using https://github.com/coralogix-se/cloudwatch-logs-sizing (follow its
+INSTRUCTIONS.md). This is read-only: do not create, change or delete anything in AWS,
+and do not deploy the IAM role yourself.
+
+1. Clone the repo, create a Python virtual environment in it, and install
+   requirements.txt.
+2. Choose how to reach my accounts:
+   - If the CoralogixLogSizingRole is deployed across my AWS Organization, use
+     `--role-name CoralogixLogSizingRole`. Add `--accounts-file accounts.json`
+     (from `python discover_accounts.py`) unless I'm in the management account.
+   - Otherwise, use my CLI and SSO profiles: run
+     `python discover_accounts.py --from-profiles`, then scan with
+     `--accounts-file accounts.json`.
+   If any profile prints "SKIP" because its SSO session has expired, stop, list
+   those profiles, tell me which `aws sso login --profile <name>` commands to run,
+   and wait for me before you run discovery again. Don't scan with accounts missing.
+3. Run the scan command with `--preflight` and show me the table. If a required
+   permission fails, stop and tell me how to fix it.
+4. Run the full scan with `--check-subscriptions --yes`. Run it in the background
+   if it takes more than a couple of minutes.
+5. Report the average, peak and p95 GB/day, events/day, shippable GB/day, the
+   per-account table, everything under NOT FULLY SCANNED with its reason, the exit
+   code, and the GetMetricData cost. Then give me the full path to
+   log_sizing_results.zip, which is the file to send to Coralogix.
+```
+
+To keep log group names inside your organization, add "Use `--redact`" to step 4. The scan only reads log group metadata and CloudWatch metrics, never log contents, and typically costs well under $1 in API charges.
+
+## What it does
+
 `collect_log_sizing.py` measures how much log data your AWS accounts send to Amazon CloudWatch Logs, so that Coralogix can size the plan for shipping those logs. It covers every log group in every enabled region of every account in scope.
 
 For each log group, and rolled up by region, account and organization, it reports:
